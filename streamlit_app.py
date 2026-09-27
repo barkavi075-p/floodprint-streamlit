@@ -43,6 +43,12 @@ HTML_PAGE = """<!DOCTYPE html>
   .brand{display:flex; align-items:baseline; gap:10px;}
   .brand h1{margin:0; font-size:1.15rem; font-weight:800; letter-spacing:.01em;}
   .brand span{color:var(--muted); font-size:.82rem;}
+  .alert-banner{
+    display:flex; align-items:center; gap:8px; background:var(--high)22; color:var(--high);
+    border:1px solid var(--high)55; padding:6px 14px; border-radius:20px; font-size:.78rem; font-weight:700;
+  }
+  .alert-banner .dot{width:8px; height:8px; border-radius:50%; background:var(--high); animation:blink 1.3s ease-in-out infinite;}
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
   .stats{display:flex; gap:22px; flex-wrap:wrap;}
   .stat{text-align:right;}
   .stat b{display:block; font-size:1.15rem; font-weight:700;}
@@ -76,6 +82,8 @@ HTML_PAGE = """<!DOCTYPE html>
     100%{ r:26; opacity:0; }
   }
   .sitelabel{font-size:9px; fill:var(--muted); font-family:"IBM Plex Mono",monospace;}
+  .statelabel{font-size:10px; font-weight:700; fill:var(--text); font-family:"Manrope",sans-serif; pointer-events:none;}
+  .bell{color:var(--high); margin-right:4px;}
 
   .side{background:var(--panel); display:flex; flex-direction:column; min-height:0;}
   .side-head{padding:16px 18px 10px; border-bottom:1px solid var(--line);}
@@ -118,6 +126,7 @@ HTML_PAGE = """<!DOCTYPE html>
     <h1>FloodPrint</h1>
     <span>Live watchlist — prototype demo</span>
   </div>
+  <div class="alert-banner" id="alertBanner"><span class="dot"></span><span id="alertText">–</span></div>
   <div class="stats">
     <div class="stat"><b class="mono" id="statTotal">–</b><small>sites flagged</small></div>
     <div class="stat"><b class="mono" id="statHigh">–</b><small>high risk</small></div>
@@ -168,22 +177,25 @@ HTML_PAGE = """<!DOCTYPE html>
 
 <script>
 const sites = [
-  {id:"A", name:"Riverside Residency", x:300, y:300, risk:92, pop:18400, type:"Residential complex (240 units)", status:"Illegal — floodplain", detected:"14 Aug 2026", dist:"2.1 km downstream"},
-  {id:"E", name:"Metro Logistics Hub", x:150, y:150, risk:88, pop:2300, type:"Logistics warehouse", status:"Illegal — dry tank bed", detected:"02 Sep 2026", dist:"6.8 km downstream"},
-  {id:"B", name:"Greenfield Warehouse", x:500, y:480, risk:78, pop:6200, type:"Warehouse cluster", status:"Unpermitted", detected:"22 Jul 2026", dist:"4.4 km downstream"},
-  {id:"G", name:"Northside Extension", x:240, y:220, risk:70, pop:7500, type:"Housing layout (extension)", status:"Unpermitted", detected:"30 Aug 2026", dist:"5.9 km downstream"},
-  {id:"C", name:"Lakeview Homes Ph2", x:680, y:420, risk:65, pop:9800, type:"Housing project, phase 2", status:"Under review", detected:"10 Sep 2026", dist:"3.5 km downstream"},
-  {id:"D", name:"Sunrise Apartments", x:420, y:350, risk:54, pop:4100, type:"Apartment block", status:"Permit pending", detected:"18 Jun 2026", dist:"3.9 km downstream"},
-  {id:"F", name:"Palm Grove Layout", x:780, y:540, risk:41, pop:3000, type:"Plotted layout", status:"Under review", detected:"05 Sep 2026", dist:"7.6 km downstream"}
+  {id:"A", name:"Riverside Residency", state:"Tamil Nadu", x:300, y:300, risk:92, pop:18400, type:"Residential complex (240 units)", status:"Illegal — floodplain", detected:"14 Aug 2026", dist:"2.1 km downstream"},
+  {id:"E", name:"Metro Logistics Hub", state:"Assam", x:150, y:150, risk:88, pop:2300, type:"Logistics warehouse", status:"Illegal — dry tank bed", detected:"02 Sep 2026", dist:"6.8 km downstream"},
+  {id:"B", name:"Greenfield Warehouse", state:"Bihar", x:500, y:480, risk:78, pop:6200, type:"Warehouse cluster", status:"Unpermitted", detected:"22 Jul 2026", dist:"4.4 km downstream"},
+  {id:"G", name:"Northside Extension", state:"Kerala", x:240, y:220, risk:70, pop:7500, type:"Housing layout (extension)", status:"Unpermitted", detected:"30 Aug 2026", dist:"5.9 km downstream"},
+  {id:"C", name:"Lakeview Homes Ph2", state:"West Bengal", x:680, y:420, risk:65, pop:9800, type:"Housing project, phase 2", status:"Under review", detected:"10 Sep 2026", dist:"3.5 km downstream"},
+  {id:"D", name:"Sunrise Apartments", state:"Odisha", x:420, y:350, risk:54, pop:4100, type:"Apartment block", status:"Permit pending", detected:"18 Jun 2026", dist:"3.9 km downstream"},
+  {id:"F", name:"Palm Grove Layout", state:"Karnataka", x:780, y:540, risk:41, pop:3000, type:"Plotted layout", status:"Under review", detected:"05 Sep 2026", dist:"7.6 km downstream"}
 ];
 sites.sort((a,b)=>b.risk-a.risk);
 
 function tier(r){ return r>=75?"high":(r>=50?"med":"low"); }
 const col = {high:"var(--high)", med:"var(--med)", low:"var(--low)"};
+const alertDays = {high:5, med:7, low:10};
 
 document.getElementById("statTotal").textContent = sites.length;
-document.getElementById("statHigh").textContent = sites.filter(s=>tier(s.risk)==="high").length;
+const highCount = sites.filter(s=>tier(s.risk)==="high").length;
+document.getElementById("statHigh").textContent = highCount;
 document.getElementById("statPop").textContent = sites.reduce((a,s)=>a+s.pop,0).toLocaleString();
+document.getElementById("alertText").textContent = highCount + " active alert" + (highCount===1?"":"s") + " — re-checked every " + alertDays.high + " days";
 
 const sitesG = document.getElementById("sites");
 sites.forEach(s=>{
@@ -191,7 +203,8 @@ sites.forEach(s=>{
   g.setAttribute("class","site"); g.setAttribute("data-id",s.id); g.setAttribute("data-tier",tier(s.risk));
   const r = 6 + Math.min(s.pop,20000)/20000*6;
   g.innerHTML = `<circle class="ring" cx="${s.x}" cy="${s.y}" r="12" stroke="${col[tier(s.risk)]}"/>
-    <circle class="core" cx="${s.x}" cy="${s.y}" r="${r.toFixed(1)}" fill="${col[tier(s.risk)]}"/>`;
+    <circle class="core" cx="${s.x}" cy="${s.y}" r="${r.toFixed(1)}" fill="${col[tier(s.risk)]}"/>
+    <text class="statelabel" x="${s.x+r+6}" y="${s.y+4}">${s.state}</text>`;
   g.addEventListener("click", ()=>select(s.id));
   sitesG.appendChild(g);
 });
@@ -200,9 +213,9 @@ const list = document.getElementById("list");
 sites.forEach(s=>{
   const li = document.createElement("li");
   li.className="row"; li.dataset.id=s.id; li.dataset.tier=tier(s.risk);
-  li.innerHTML = `<div class="row-top"><strong>${s.name}</strong>
+  li.innerHTML = `<div class="row-top"><strong>${tier(s.risk)==="high" ? '<span class=\"bell\">🔔</span>' : ''}${s.name}</strong>
       <span class="risk mono" style="background:${col[tier(s.risk)]}22; color:${col[tier(s.risk)]}">${s.risk}</span></div>
-    <div class="row-meta"><span>${s.type}</span><span class="mono">${s.pop.toLocaleString()} downstream</span></div>`;
+    <div class="row-meta"><span>${s.state} · ${s.type}</span><span class="mono">${s.pop.toLocaleString()} downstream</span></div>`;
   li.addEventListener("click", ()=>select(s.id));
   list.appendChild(li);
 });
@@ -215,11 +228,13 @@ function select(id){
   detail.innerHTML = `<h3>${s.name}</h3>
     <span class="status" style="background:${col[tier(s.risk)]}22; color:${col[tier(s.risk)]}">${s.status}</span>
     <dl>
+      <dt>State</dt><dd>${s.state}</dd>
       <dt>Risk score</dt><dd>${s.risk} / 100</dd>
       <dt>Downstream population</dt><dd>${s.pop.toLocaleString()}</dd>
       <dt>Distance</dt><dd>${s.dist}</dd>
       <dt>Detected</dt><dd>${s.detected}</dd>
       <dt>Construction type</dt><dd>${s.type}</dd>
+      <dt>Alert re-check</dt><dd>every ${alertDays[tier(s.risk)]} days</dd>
     </dl>`;
 }
 select(sites[0].id);
